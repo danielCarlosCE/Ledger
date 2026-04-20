@@ -8,52 +8,68 @@
 import SwiftUI
 
 struct TransactionRowView: View {
-    let name: String
-    let amount: String
-    let isPositive: Bool
-    let status: String
-    let statusColor: Color
-    let date: String
+    let row: TransactionRow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(name)
+                Text(row.counterpartyName)
                 Spacer()
-                Text(amount)
+                Text(row.amount)
                     .fontWeight(.semibold)
-                    .foregroundStyle(isPositive ? .green : .red)
+                    .foregroundStyle(row.isIncoming ? .green : .red)
             }
             HStack(spacing: 6) {
                 Image(systemName: "circle.fill")
                     .font(.system(size: 6))
                     .foregroundStyle(statusColor)
-                    .accessibilityHidden(true)
-                Text(status)
+                Text(statusText)
                 Text("·")
-                Text(date)
+                Text(row.date)
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySentence)
+        .accessibilityLabel(row.accessibilityLabel)
     }
 
-    var accessibilitySentence: String {
-        let digits = amount.drop { !$0.isNumber }
-        let preposition = isPositive ? "from" : "to"
-        return "\(status) payment of \(digits) \(preposition) \(name), \(date)"
+    private var statusText: String {
+        switch row.status {
+        case .completed: "Completed"
+        case .pending: "Pending"
+        case .declined: "Declined"
+        }
+    }
+
+    private var statusColor: Color {
+        switch row.status {
+        case .completed: .green
+        case .pending: .orange
+        case .declined: .red
+        }
     }
 }
 
 #Preview {
     List {
-        TransactionRowView(name: "Salary", amount: "+3200 EUR", isPositive: true, status: "Completed", statusColor: .green, date: "Today")
-        TransactionRowView(name: "Amazon", amount: "-89 EUR", isPositive: false, status: "Completed", statusColor: .green, date: "Yesterday")
-        TransactionRowView(name: "Spotify", amount: "-9 EUR", isPositive: false, status: "Pending", statusColor: .orange, date: "April 14th")
-        TransactionRowView(name: "Uber", amount: "-12 EUR", isPositive: false, status: "Declined", statusColor: .red, date: "March 28th")
+        TransactionRowView(row: TransactionRow(
+            id: "1", counterpartyName: "Salary", amount: "+3200 EUR",
+            isIncoming: true, status: .completed, date: "Today"
+        ))
+        TransactionRowView(row: TransactionRow(
+            id: "2", counterpartyName: "Amazon", amount: "-89 EUR",
+            isIncoming: false, status: .completed, date: "Yesterday"
+        ))
+        TransactionRowView(row: TransactionRow(
+            id: "3", counterpartyName: "Spotify", amount: "-9 EUR",
+            isIncoming: false, status: .pending, date: "April 14th"
+        ))
+        TransactionRowView(row: TransactionRow(
+            id: "4", counterpartyName: "Uber", amount: "-12 EUR",
+            isIncoming: false, status: .declined, date: "March 28th"
+        ))
     }
     .listStyle(.plain)
 }
