@@ -11,7 +11,7 @@ import SwiftUI
 struct QontoApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TransactionsListView()
         }
     }
 }
