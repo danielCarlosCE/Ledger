@@ -1,0 +1,5 @@
+**/Pods
+**/Carthage
+.DS_Store
+Qonto/Qonto.xcodeproj/xcuserdata
+Qonto/Qonto.xcodeproj/project.xcworkspace/xcuserdata
