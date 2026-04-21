@@ -110,28 +110,28 @@ private let previewItemsPerPage = 15
 #Preview("Success") {
     TransactionsListView(
         itemsPerPage: previewItemsPerPage,
-        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.success))
+        viewModel: TransactionsViewModel(remote: StubRemoteTransactionsService(.success))
     )
 }
 
 #Preview("Offline") {
     TransactionsListView(
         itemsPerPage: previewItemsPerPage,
-        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.offline)))
+        viewModel: TransactionsViewModel(remote: StubRemoteTransactionsService(.failure(.offline)))
     )
 }
 
 #Preview("General Error") {
     TransactionsListView(
         itemsPerPage: previewItemsPerPage,
-        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.general(NSError()))))
+        viewModel: TransactionsViewModel(remote: StubRemoteTransactionsService(.failure(.general(NSError()))))
     )
 }
 
 #Preview("Loading") {
     TransactionsListView(
         itemsPerPage: previewItemsPerPage,
-        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.loading))
+        viewModel: TransactionsViewModel(remote: StubRemoteTransactionsService(.loading))
     )
 }
 
@@ -139,7 +139,7 @@ private let previewItemsPerPage = 15
     TransactionsListView(
         itemsPerPage: previewItemsPerPage,
         viewModel: TransactionsViewModel(
-            service: StubRemoteTransactionsService(firstPage: .success, loadMore: .failure(.offline))
+            remote: StubRemoteTransactionsService(firstPage: .success, loadMore: .failure(.offline))
         )
     )
 }

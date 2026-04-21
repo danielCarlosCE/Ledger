@@ -14,32 +14,30 @@ final class TransactionsViewModel {
 
     private var itemsPerPage: Int = 0
     private var isLoadingMore: Bool = false
-    private let service: RemoteTransactionsService
+    private var source: DataSource = .remote
+    private let remote: RemoteTransactionsService
+    private let local: LocalTransactionsService
 
-    init(service: RemoteTransactionsService) {
-        self.service = service
+    init(
+        remote: RemoteTransactionsService = DefaultRemoteTransactionsService(),
+        local: LocalTransactionsService = DefaultLocalTransactionsService()
+    ) {
+        self.remote = remote
+        self.local = local
     }
 
     func load(itemsPerPage: Int) async {
-        if case .loading = state { return }
         self.itemsPerPage = itemsPerPage
         state = .loading
+        source = .remote
         do {
-            let transactions = try await service.transactions(page: 1, itemsPerPage: itemsPerPage)
-            let rows = makeRows(from: transactions)
-            let content = State.Content(
-                rows: rows,
-                page: 1,
-                loadMoreState: transactions.count == itemsPerPage ? .hasMore : .ended
-            )
-            state = .loaded(content)
+            let transactions = try await remote.transactions(page: 1, itemsPerPage: itemsPerPage)
+            setFirstPage(transactions)
+            await refreshCache(with: transactions)
+        } catch RemoteTransactionsServiceError.offline {
+            await fallbackToCacheIfPossible()
         } catch {
-            switch error {
-            case .offline:
-                state = .error(.offline)
-            case .general:
-                state = .error(.general)
-            }
+            state = .error(.general)
         }
     }
 
@@ -55,28 +53,68 @@ final class TransactionsViewModel {
 
         isLoadingMore = true
         defer { isLoadingMore = false }
-        
+
         content.loadMoreState = .hasMore
         state = .loaded(content)
 
-        do {
-            let transactions = try await service.transactions(page: content.page + 1, itemsPerPage: itemsPerPage)
-            guard case .loaded(var updated) = state else { return }
-            let newRows = makeRows(from: transactions)
-            updated.rows.append(contentsOf: newRows)
-            updated.page += 1
-            updated.loadMoreState = (transactions.count == itemsPerPage) ? .hasMore : .ended
-            state = .loaded(updated)
-        } catch {
-            guard case .loaded(var updated) = state else { return }
-            switch error {
-            case .offline:
-                updated.loadMoreState = .error(.offline)
-            case .general:
-                updated.loadMoreState = .error(.general)
-            }
-            state = .loaded(updated)
+        let nextPage = content.page + 1
+        switch source {
+        case .local:  await loadMoreLocal(page: nextPage)
+        case .remote: await loadMoreRemote(page: nextPage)
         }
+    }
+
+    private func loadMoreLocal(page: Int) async {
+        let transactions = await local.transactions(page: page, itemsPerPage: itemsPerPage)
+        appendNextPage(transactions, page: page)
+    }
+
+    private func loadMoreRemote(page: Int) async {
+        do {
+            let transactions = try await remote.transactions(page: page, itemsPerPage: itemsPerPage)
+            appendNextPage(transactions, page: page)
+            await local.save(transactions)
+        } catch RemoteTransactionsServiceError.offline {
+            setLoadMoreError(.offline)
+        } catch {
+            setLoadMoreError(.general)
+        }
+    }
+
+    private func setFirstPage(_ transactions: [Transaction]) {
+        let rows = makeRows(from: transactions)
+        let loadMoreState: LoadMoreState = transactions.count == itemsPerPage ? .hasMore : .ended
+        state = .loaded(State.Content(rows: rows, page: 1, loadMoreState: loadMoreState))
+    }
+
+    private func appendNextPage(_ transactions: [Transaction], page: Int) {
+        guard case .loaded(var updated) = state else { return }
+        let newRows = makeRows(from: transactions)
+        updated.rows.append(contentsOf: newRows)
+        updated.page = page
+        updated.loadMoreState = transactions.count == itemsPerPage ? .hasMore : .ended
+        state = .loaded(updated)
+    }
+
+    private func refreshCache(with transactions: [Transaction]) async {
+        await local.deleteAll()
+        await local.save(transactions)
+    }
+
+    private func fallbackToCacheIfPossible() async {
+        let cached = await local.transactions(page: 1, itemsPerPage: itemsPerPage)
+        guard !cached.isEmpty else {
+            state = .error(.offline)
+            return
+        }
+        source = .local
+        setFirstPage(cached)
+    }
+
+    private func setLoadMoreError(_ kind: ErrorKind) {
+        guard case .loaded(var content) = state else { return }
+        content.loadMoreState = .error(kind)
+        state = .loaded(content)
     }
 
     // MARK: - Domain → UI mapping
@@ -137,6 +175,11 @@ extension TransactionsViewModel {
         case hasMore
         case error(ErrorKind)
         case ended
+    }
+
+    enum DataSource {
+        case remote
+        case local
     }
 
     enum ErrorKind: Equatable {

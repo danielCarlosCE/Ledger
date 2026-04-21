@@ -11,19 +11,28 @@ import Foundation
 
 struct TransactionsViewModelTests {
 
+    let remote: MockRemoteTransactionsService
+    let local: MockLocalTransactionsService
+    let sut: TransactionsViewModel
     let itemsPerPage = 10
+
+    init() {
+        let remote = MockRemoteTransactionsService()
+        let local = MockLocalTransactionsService()
+        self.remote = remote
+        self.local = local
+        self.sut = TransactionsViewModel(remote: remote, local: local)
+    }
 
     @Test("Given a full batch response, when load runs, then state is loaded with page 1")
     func loadStateLoadedWithPage1() async {
-        let service = MockRemoteTransactionsService()
-        service.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
-        let sut = TransactionsViewModel(service: service)
+        remote.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
 
         await sut.load(itemsPerPage: itemsPerPage)
 
-        #expect(service.calls.count == 1)
-        #expect(service.calls.first?.page == 1)
-        #expect(service.calls.first?.itemsPerPage == itemsPerPage)
+        #expect(remote.calls.count == 1)
+        #expect(remote.calls.first?.page == 1)
+        #expect(remote.calls.first?.itemsPerPage == itemsPerPage)
         guard case .loaded(let content) = sut.state else {
             Issue.record("Expected .loaded state")
             return
@@ -33,11 +42,19 @@ struct TransactionsViewModelTests {
         #expect(content.loadMoreState == .hasMore)
     }
 
+    @Test("Given successful initial load, when load runs, then local is wiped and new transactions are saved")
+    func loadWipesLocalAndSavesOnSuccess() async {
+        remote.result = [sampleTransaction("x"), sampleTransaction("y")]
+
+        await sut.load(itemsPerPage: itemsPerPage)
+
+        #expect(local.deleteAllCallCount == 1)
+        #expect(local.saveCalls.count == 1)
+    }
+
     @Test("Given a short batch response, when load runs, then loadMoreState is ended")
     func loadShortBatchEndsPagination() async {
-        let service = MockRemoteTransactionsService()
-        service.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage - 1)
-        let sut = TransactionsViewModel(service: service)
+        remote.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage - 1)
 
         await sut.load(itemsPerPage: itemsPerPage)
 
@@ -50,38 +67,19 @@ struct TransactionsViewModelTests {
 
     @Test("Given a loaded VM, when loadMore runs, then the service is called with the next page")
     func loadMoreUsesNextPage() async {
-        let service = MockRemoteTransactionsService()
-        service.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
-        let sut = TransactionsViewModel(service: service)
+        remote.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
 
         await sut.load(itemsPerPage: itemsPerPage)
         await sut.loadMore()
 
-        #expect(service.calls.count == 2)
-        #expect(service.calls.last?.page == 2)
-        #expect(service.calls.last?.itemsPerPage == itemsPerPage)
-    }
-
-    @Test("Given service throws offline, when load runs, then state is error offline")
-    func loadErrorOffline() async {
-        let service = MockRemoteTransactionsService()
-        service.error = .offline
-        let sut = TransactionsViewModel(service: service)
-
-        await sut.load(itemsPerPage: itemsPerPage)
-
-        guard case .error(let kind) = sut.state else {
-            Issue.record("Expected .error state")
-            return
-        }
-        #expect(kind == .offline)
+        #expect(remote.calls.count == 2)
+        #expect(remote.calls.last?.page == 2)
+        #expect(remote.calls.last?.itemsPerPage == itemsPerPage)
     }
 
     @Test("Given service throws general, when load runs, then state is error general")
     func loadErrorGeneral() async {
-        let service = MockRemoteTransactionsService()
-        service.error = .general(URLError(.badServerResponse))
-        let sut = TransactionsViewModel(service: service)
+        remote.error = .general(URLError(.badServerResponse))
 
         await sut.load(itemsPerPage: itemsPerPage)
 
@@ -94,12 +92,10 @@ struct TransactionsViewModelTests {
 
     @Test("Given loadMore fails with offline, when loadMore runs, then loadMoreState is error offline and rows remain")
     func loadMoreErrorOffline() async {
-        let service = MockRemoteTransactionsService()
-        service.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
-        let sut = TransactionsViewModel(service: service)
+        remote.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
 
         await sut.load(itemsPerPage: itemsPerPage)
-        service.error = .offline
+        remote.error = .offline
         await sut.loadMore()
 
         guard case .loaded(let content) = sut.state else { Issue.record("Expected .loaded"); return }
@@ -109,17 +105,57 @@ struct TransactionsViewModelTests {
 
     @Test("Given loadMore fails with general, when loadMore runs, then loadMoreState is error general")
     func loadMoreErrorGeneral() async {
-        let service = MockRemoteTransactionsService()
-        service.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
-        let sut = TransactionsViewModel(service: service)
+        remote.result = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
 
         await sut.load(itemsPerPage: itemsPerPage)
-        service.error = .general(URLError(.badServerResponse))
+        remote.error = .general(URLError(.badServerResponse))
         await sut.loadMore()
 
         guard case .loaded(let content) = sut.state else { Issue.record("Expected .loaded"); return }
         #expect(content.rows.count == itemsPerPage)
         #expect(content.loadMoreState == .error(.general))
+    }
+
+    @Test("Given remote offline and local has data, when load runs, then state shows cached transactions")
+    func loadFallsBackToCacheWhenAvailable() async {
+        remote.error = .offline
+        local.storedTransactions = [sampleTransaction("c1"), sampleTransaction("c2")]
+
+        await sut.load(itemsPerPage: itemsPerPage)
+
+        guard case .loaded(let content) = sut.state else {
+            Issue.record("Expected .loaded")
+            return
+        }
+        #expect(content.rows.count == 2)
+    }
+
+    @Test("Given remote offline and local empty, when load runs, then state is error offline")
+    func loadErrorWhenOfflineAndNoCache() async {
+        remote.error = .offline
+        // local.storedTransactions defaults to []
+
+        await sut.load(itemsPerPage: itemsPerPage)
+
+        guard case .error(.offline) = sut.state else {
+            Issue.record("Expected .error(.offline)")
+            return
+        }
+    }
+
+    @Test("Given source is local after cache fallback, when loadMore runs, then local fetches next page")
+    func loadMoreFromLocalFetchesNextPage() async {
+        remote.error = .offline
+        local.storedTransactions = Array(repeating: sampleTransaction("x"), count: itemsPerPage)
+        await sut.load(itemsPerPage: itemsPerPage)
+
+        await sut.loadMore()
+
+        // First call: fallbackToCacheIfPossible fetched page 1.
+        // Second call: loadMoreLocal fetched page 2.
+        #expect(local.fetchCalls.count == 2)
+        #expect(local.fetchCalls.last?.page == 2)
+        #expect(local.fetchCalls.last?.itemsPerPage == itemsPerPage)
     }
 }
 
