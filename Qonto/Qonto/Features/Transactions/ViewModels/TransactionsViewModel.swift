@@ -47,19 +47,16 @@ final class TransactionsViewModel {
     }
 
     /// Safe to call repeatedly — in-flight calls are ignored.
-    func loadMore() {
+    func loadMore() async {
         guard
             case .loaded(let content) = state,
             content.canLoadMore,
-            !isLoadingMore,
-            itemsPerPage > 0
+            !isLoadingMore
         else { return }
 
         isLoadingMore = true
-        Task {
-            await performLoadMore()
-            isLoadingMore = false
-        }
+        await performLoadMore()
+        isLoadingMore = false
     }
 
     private func performLoadMore() async {

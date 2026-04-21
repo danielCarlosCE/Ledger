@@ -14,7 +14,7 @@ public final class DefaultRemoteTransactionsService: RemoteTransactionsService {
     /// Captured from the first response. Sent on subsequent requests so pagination stays consistent.
     private var seed: String?
 
-    public init(client: ApiClient = ApiClient()) {
+    public init(client: ApiClient = DefaultApiClient()) {
         self.client = client
     }
 

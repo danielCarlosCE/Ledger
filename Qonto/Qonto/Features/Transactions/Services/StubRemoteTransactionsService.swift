@@ -1,5 +1,5 @@
 //
-//  MockRemoteTransactionsService.swift
+//  StubRemoteTransactionsService.swift
 //  Qonto
 //
 //  Created by Daniel Souza on 21.04.26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct MockRemoteTransactionsService: RemoteTransactionsService {
+struct StubRemoteTransactionsService: RemoteTransactionsService {
     func transactions(page: Int, itemsPerPage: Int) async throws(RemoteTransactionsServiceError) -> [Transaction] {
         try? await Task.sleep(for: .seconds(1))
         guard itemsPerPage > 0, page >= 0 else { return [] }

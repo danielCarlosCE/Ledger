@@ -7,12 +7,16 @@
 
 import Foundation
 
-public final class ApiClient {
+public protocol ApiClient {
+    func fetch<Response: Decodable>(_ route: Route<Response>) async throws -> Response
+}
+
+public final class DefaultApiClient: ApiClient {
     private let session: URLSession
 
     /// ISO8601 with fractional seconds matches the backend's `settledAt`
     /// values (e.g. `"2026-03-26T03:33:09.163Z"`).
-    private lazy var decoder: JSONDecoder = {
+    internal private(set) lazy var decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder

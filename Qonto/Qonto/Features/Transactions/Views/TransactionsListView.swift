@@ -45,7 +45,7 @@ struct TransactionsListView: View {
                         // ProgressView in List freezes after reattach; new id per page forces a fresh instance.
                         .id(content.page)
                         .onAppear {
-                            viewModel.loadMore()
+                            Task { await viewModel.loadMore() }
                         }
                 }
             }
@@ -55,5 +55,5 @@ struct TransactionsListView: View {
 }
 
 #Preview {
-    TransactionsListView(viewModel: .init(service: MockRemoteTransactionsService()))
+    TransactionsListView(viewModel: .init(service: StubRemoteTransactionsService()))
 }
