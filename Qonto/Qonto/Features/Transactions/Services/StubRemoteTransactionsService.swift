@@ -43,7 +43,7 @@ public struct StubRemoteTransactionsService: RemoteTransactionsService {
             guard start < Self.totalCount else { return [] }
 
             let end = min(start + itemsPerPage, Self.totalCount)
-            return Self.makeTransactions(page: page, range: start..<end)
+            return self.makeTransactions(page: page, range: start..<end)
         }
     }
 
@@ -65,14 +65,19 @@ public struct StubRemoteTransactionsService: RemoteTransactionsService {
     /// Day offsets from today, cycled by absolute index.
     private static let dayOffsets = [0, 1, 7, 11, 14, 21, 27, 34, 60, 70, 77, 86, 99, 107]
 
-    private static func makeTransactions(page: Int, range: Range<Int>) -> [Transaction] {
+    func makeTransactions(page: Int, itemsPerPage: Int) -> [Transaction] {
+        guard itemsPerPage > 0, page >= 1 else { return [] }
+        return makeTransactions(page: page, range: 0..<itemsPerPage)
+    }
+
+    private func makeTransactions(page: Int, range: Range<Int>) -> [Transaction] {
         let calendar = Calendar.current
         let now = Date.now
 
         return range.enumerated().map { localIndex, absoluteIndex in
-            let name = names[absoluteIndex % names.count]
-            let status = statuses[absoluteIndex % statuses.count]
-            let dayOffset = dayOffsets[absoluteIndex % dayOffsets.count]
+            let name = Self.names[absoluteIndex % Self.names.count]
+            let status = Self.statuses[absoluteIndex % Self.statuses.count]
+            let dayOffset = Self.dayOffsets[absoluteIndex % Self.dayOffsets.count]
             let isIncoming = (absoluteIndex % 3 == 0)
             let side: Transaction.Side = isIncoming ? .credit : .debit
             let magnitude = (absoluteIndex + 1) * 12

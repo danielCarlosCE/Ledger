@@ -9,12 +9,12 @@ import SwiftUI
 
 @main
 struct QontoApp: App {
+    private let remoteService = DefaultRemoteTransactionsService()
+
     var body: some Scene {
         WindowGroup {
             TransactionsListView(
-                viewModel: TransactionsViewModel(
-                    service: DefaultRemoteTransactionsService()
-                )
+                viewModel: TransactionsViewModel(service: remoteService)
             )
         }
     }
