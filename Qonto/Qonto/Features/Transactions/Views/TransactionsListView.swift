@@ -27,9 +27,23 @@ struct TransactionsListView: View {
             ProgressView() {
                 Text("loading...")
             }
-        case .loaded(let rows):
-            List(rows) { row in
-                TransactionRowView(row: row)
+        case .loaded(let content):
+            List {
+                ForEach(content.rows) { row in
+                    TransactionRowView(row: row)
+                }
+
+                if content.canLoadMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .listRowSeparator(.hidden)
+                        .accessibilityLabel("Loading more transactions")
+                        // ProgressView in List freezes after reattach; new id per page forces a fresh instance.
+                        .id(content.page)
+                        .onAppear {
+                            viewModel.loadMore()
+                        }
+                }
             }
             .listStyle(.plain)
         }
