@@ -11,7 +11,11 @@ import SwiftUI
 struct QontoApp: App {
     var body: some Scene {
         WindowGroup {
-            TransactionsListView()
+            TransactionsListView(
+                viewModel: TransactionsViewModel(
+                    service: DefaultRemoteTransactionsService()
+                )
+            )
         }
     }
 }

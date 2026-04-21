@@ -8,7 +8,11 @@
 import SwiftUI
 
 struct TransactionsListView: View {
-    @State private var viewModel = TransactionsViewModel()
+    @State private var viewModel: TransactionsViewModel
+
+    init(viewModel: TransactionsViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
 
     var body: some View {
         NavigationStack {
@@ -51,5 +55,5 @@ struct TransactionsListView: View {
 }
 
 #Preview {
-    TransactionsListView()
+    TransactionsListView(viewModel: .init(service: MockRemoteTransactionsService()))
 }

@@ -26,18 +26,18 @@ final class TransactionsViewModel {
     private var itemsPerPage: Int = 0
     private let service: RemoteTransactionsService
 
-    init(service: RemoteTransactionsService = MockRemoteTransactionsService()) {
+    init(service: RemoteTransactionsService) {
         self.service = service
     }
 
     func load(itemsPerPage: Int) async {
         self.itemsPerPage = itemsPerPage
         do {
-            let transactions = try await service.transactions(page: 0, itemsPerPage: itemsPerPage)
+            let transactions = try await service.transactions(page: 1, itemsPerPage: itemsPerPage)
             let rows = makeRows(from: transactions)
             let content = State.Content(
                 rows: rows,
-                page: 0,
+                page: 1,
                 canLoadMore: transactions.count == itemsPerPage
             )
             state = .loaded(content)

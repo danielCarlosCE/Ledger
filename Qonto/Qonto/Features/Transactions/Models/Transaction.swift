@@ -7,9 +7,8 @@
 
 import Foundation
 
-public struct Transaction: Identifiable {
+public struct Transaction: Decodable, Identifiable {
     public let id: String
-    let counterparty: String
     let amount: Amount
     let status: Status
     /// Accounting side of the transaction.
@@ -17,19 +16,42 @@ public struct Transaction: Identifiable {
     let side: Side
     let settledAt: Date?
 
-    struct Amount {
-        let currency: String
-        let value: String
+    /// Wire name; exposed via ``counterparty``.
+    private let counterpartyName: String
+    var counterparty: String { counterpartyName }
+
+    public struct Amount: Decodable {
+        public let currency: String
+        public let value: String
     }
 
-    enum Status {
-        case completed
-        case pending
-        case declined
+    public enum Status: String, Decodable {
+        case completed = "COMPLETED"
+        case pending = "PENDING"
+        case declined = "DECLINED"
     }
 
-    enum Side {
-        case credit
-        case debit
+    public enum Side: String, Decodable {
+        case credit = "CREDIT"
+        case debit = "DEBIT"
+    }
+}
+
+extension Transaction {
+    /// Memberwise initializer for test fixtures and mocks.
+    public init(
+        id: String,
+        counterparty: String,
+        amount: Amount,
+        status: Status,
+        side: Side,
+        settledAt: Date?
+    ) {
+        self.id = id
+        self.counterpartyName = counterparty
+        self.amount = amount
+        self.status = status
+        self.side = side
+        self.settledAt = settledAt
     }
 }
