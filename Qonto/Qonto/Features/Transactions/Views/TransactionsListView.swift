@@ -22,6 +22,17 @@ struct TransactionsListView: View {
         NavigationStack {
             content
                 .navigationTitle("Transactions")
+                .toolbar {
+                    if viewModel.canReconnect {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                Task { await viewModel.load(itemsPerPage: itemsPerPage) }
+                            } label: {
+                                Label("Reconnect", systemImage: "arrow.clockwise")
+                            }
+                        }
+                    }
+                }
         }
         .task {
             await viewModel.load(itemsPerPage: itemsPerPage)

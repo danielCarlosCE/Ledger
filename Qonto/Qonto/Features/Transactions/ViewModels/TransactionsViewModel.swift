@@ -12,6 +12,8 @@ final class TransactionsViewModel {
 
     private(set) var state: State = .idle
 
+    public var canReconnect: Bool { source == .local }
+
     private var itemsPerPage: Int = 0
     private var isLoadingMore: Bool = false
     private var source: DataSource = .remote
@@ -177,7 +179,7 @@ extension TransactionsViewModel {
         case ended
     }
 
-    enum DataSource {
+    private enum DataSource {
         case remote
         case local
     }
