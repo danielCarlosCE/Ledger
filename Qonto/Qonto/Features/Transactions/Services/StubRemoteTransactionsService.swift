@@ -14,13 +14,20 @@ public struct StubRemoteTransactionsService: RemoteTransactionsService {
         case loading
     }
 
-    private let behavior: Behavior
+    private let firstPageBehavior: Behavior
+    private let loadMoreBehavior: Behavior
+
+    public init(firstPage: Behavior, loadMore: Behavior) {
+        self.firstPageBehavior = firstPage
+        self.loadMoreBehavior = loadMore
+    }
 
     public init(_ behavior: Behavior = .success) {
-        self.behavior = behavior
+        self.init(firstPage: behavior, loadMore: behavior)
     }
 
     public func transactions(page: Int, itemsPerPage: Int) async throws(RemoteTransactionsServiceError) -> [Transaction] {
+        let behavior = page == 1 ? firstPageBehavior : loadMoreBehavior
         switch behavior {
         case .loading:
             try? await Task.sleep(for: .seconds(3600))

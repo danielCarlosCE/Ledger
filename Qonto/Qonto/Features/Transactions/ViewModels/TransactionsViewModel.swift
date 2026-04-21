@@ -9,41 +9,11 @@ import Foundation
 
 @Observable
 final class TransactionsViewModel {
-    enum State {
-        case loading
-        case loaded(Content)
-        case error(ErrorKind)
 
-        struct Content {
-            var rows: [TransactionRow]
-            var page: Int
-            var canLoadMore: Bool
-        }
-    }
+    private(set) var state: State = .idle
 
-    enum ErrorKind: Equatable {
-        case offline
-        case general
-
-        var title: String {
-            switch self {
-            case .offline: "You're offline"
-            case .general: "Something went wrong"
-            }
-        }
-
-        var message: String {
-            switch self {
-            case .offline: "Check your connection and try again."
-            case .general: "Please try again in a moment."
-            }
-        }
-    }
-
-    private(set) var state: State = .loading
-
-    private var isLoadingMore = false
     private var itemsPerPage: Int = 0
+    private var isLoadingMore: Bool = false
     private let service: RemoteTransactionsService
 
     init(service: RemoteTransactionsService) {
@@ -51,6 +21,7 @@ final class TransactionsViewModel {
     }
 
     func load(itemsPerPage: Int) async {
+        if case .loading = state { return }
         self.itemsPerPage = itemsPerPage
         state = .loading
         do {
@@ -59,7 +30,7 @@ final class TransactionsViewModel {
             let content = State.Content(
                 rows: rows,
                 page: 1,
-                canLoadMore: transactions.count == itemsPerPage
+                loadMoreState: transactions.count == itemsPerPage ? .hasMore : .ended
             )
             state = .loaded(content)
         } catch {
@@ -72,33 +43,39 @@ final class TransactionsViewModel {
         }
     }
 
-    /// Safe to call repeatedly — in-flight calls are ignored.
+    /// Safe to call repeatedly — in-flight calls are ignored. Allows retry after an error.
     func loadMore() async {
         guard
-            case .loaded(let content) = state,
-            content.canLoadMore,
-            !isLoadingMore
-        else { return }
+            case .loaded(var content) = state,
+            !isLoadingMore,
+            content.loadMoreState != .ended
+        else {
+            return
+        }
 
         isLoadingMore = true
-        await performLoadMore()
-        isLoadingMore = false
-    }
-
-    private func performLoadMore() async {
-        guard case .loaded(var content) = state else { return }
-
-        let nextPage = content.page + 1
+        defer { isLoadingMore = false }
+        
+        content.loadMoreState = .hasMore
+        state = .loaded(content)
 
         do {
-            let transactions = try await service.transactions(page: nextPage, itemsPerPage: itemsPerPage)
+            let transactions = try await service.transactions(page: content.page + 1, itemsPerPage: itemsPerPage)
+            guard case .loaded(var updated) = state else { return }
             let newRows = makeRows(from: transactions)
-            content.rows.append(contentsOf: newRows)
-            content.page = nextPage
-            content.canLoadMore = transactions.count == itemsPerPage
-            state = .loaded(content)
+            updated.rows.append(contentsOf: newRows)
+            updated.page += 1
+            updated.loadMoreState = (transactions.count == itemsPerPage) ? .hasMore : .ended
+            state = .loaded(updated)
         } catch {
-            // Error states not yet in scope — leave state as-is.
+            guard case .loaded(var updated) = state else { return }
+            switch error {
+            case .offline:
+                updated.loadMoreState = .error(.offline)
+            case .general:
+                updated.loadMoreState = .error(.general)
+            }
+            state = .loaded(updated)
         }
     }
 
@@ -136,5 +113,48 @@ final class TransactionsViewModel {
         if calendar.isDateInToday(date) { return "Today" }
         if calendar.isDateInYesterday(date) { return "Yesterday" }
         return date.formatted(date: .abbreviated, time: .omitted)
+    }
+}
+
+extension TransactionsViewModel {
+
+    // MARK: - Types
+
+    enum State {
+        case idle
+        case loading
+        case loaded(Content)
+        case error(ErrorKind)
+
+        struct Content {
+            var rows: [TransactionRow]
+            var page: Int
+            var loadMoreState: LoadMoreState = .hasMore
+        }
+    }
+
+    enum LoadMoreState: Equatable {
+        case hasMore
+        case error(ErrorKind)
+        case ended
+    }
+
+    enum ErrorKind: Equatable {
+        case offline
+        case general
+
+        var title: String {
+            switch self {
+            case .offline: "You're offline"
+            case .general: "Something went wrong"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .offline: "Check your connection and try again."
+            case .general: "Please try again in a moment."
+            }
+        }
     }
 }

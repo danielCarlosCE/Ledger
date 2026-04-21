@@ -9,8 +9,12 @@ import SwiftUI
 
 struct TransactionsListView: View {
     @State private var viewModel: TransactionsViewModel
+    // Bumped on load-more retry to force a fresh ProgressView identity — see `.id(...)` on the sentinel.
+    @State private var loadMoreKey = UUID()
+    private let itemsPerPage: Int
 
-    init(viewModel: TransactionsViewModel) {
+    init(itemsPerPage: Int = 20, viewModel: TransactionsViewModel) {
+        self.itemsPerPage = itemsPerPage
         _viewModel = State(initialValue: viewModel)
     }
 
@@ -20,13 +24,14 @@ struct TransactionsListView: View {
                 .navigationTitle("Transactions")
         }
         .task {
-            await viewModel.load(itemsPerPage: 20)
+            await viewModel.load(itemsPerPage: itemsPerPage)
         }
     }
 
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
+        case .idle: EmptyView()
         case .loading:
             ProgressView() {
                 Text("loading...")
@@ -37,17 +42,7 @@ struct TransactionsListView: View {
                     TransactionRowView(row: row)
                 }
 
-                if content.canLoadMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .listRowSeparator(.hidden)
-                        .accessibilityLabel("Loading more transactions")
-                        // ProgressView in List freezes after reattach; new id per page forces a fresh instance.
-                        .id(content.page)
-                        .onAppear {
-                            Task { await viewModel.loadMore() }
-                        }
-                }
+                loadMoreFooter(for: content)
             }
             .listStyle(.plain)
         case .error(let kind):
@@ -57,9 +52,48 @@ struct TransactionsListView: View {
                 Text(kind.message)
             } actions: {
                 Button("Try again") {
-                    Task { await viewModel.load(itemsPerPage: 20) }
+                    Task { await viewModel.load(itemsPerPage: itemsPerPage) }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func loadMoreFooter(for content: TransactionsViewModel.State.Content) -> some View {
+        switch content.loadMoreState {
+        case .hasMore:
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .listRowSeparator(.hidden)
+                .accessibilityLabel("Loading more transactions")
+                // ProgressView's UIKit-backed indicator may not resume after reuse; page + retry key
+                // gives a fresh id for most cases (new page on scroll, new key on retry).
+                .id("\(content.page)-\(loadMoreKey)")
+                .onAppear {
+                    Task { await viewModel.loadMore() }
+                }
+
+        case .error(let kind):
+            HStack {
+                Spacer()
+                VStack(spacing: 8) {
+                    Label(kind.message, systemImage: icon(for: kind))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Try again") {
+                        loadMoreKey = UUID()
+                        Task { await viewModel.loadMore() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .listRowSeparator(.hidden)
+
+        case .ended:
+            EmptyView()
         }
     }
 
@@ -71,18 +105,41 @@ struct TransactionsListView: View {
     }
 }
 
+private let previewItemsPerPage = 15
+
 #Preview("Success") {
-    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.success)))
+    TransactionsListView(
+        itemsPerPage: previewItemsPerPage,
+        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.success))
+    )
 }
 
 #Preview("Offline") {
-    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.offline))))
+    TransactionsListView(
+        itemsPerPage: previewItemsPerPage,
+        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.offline)))
+    )
 }
 
 #Preview("General Error") {
-    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.general(NSError())))))
+    TransactionsListView(
+        itemsPerPage: previewItemsPerPage,
+        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.general(NSError()))))
+    )
 }
 
 #Preview("Loading") {
-    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.loading)))
+    TransactionsListView(
+        itemsPerPage: previewItemsPerPage,
+        viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.loading))
+    )
+}
+
+#Preview("Load more fails") {
+    TransactionsListView(
+        itemsPerPage: previewItemsPerPage,
+        viewModel: TransactionsViewModel(
+            service: StubRemoteTransactionsService(firstPage: .success, loadMore: .failure(.offline))
+        )
+    )
 }
