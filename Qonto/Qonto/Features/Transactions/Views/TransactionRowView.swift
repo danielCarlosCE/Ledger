@@ -13,7 +13,7 @@ struct TransactionRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(row.counterpartyName)
+                Text(row.counterparty)
                 Spacer()
                 Text(row.amount)
                     .fontWeight(.semibold)
@@ -24,8 +24,10 @@ struct TransactionRowView: View {
                     .font(.system(size: 6))
                     .foregroundStyle(statusColor)
                 Text(statusText)
-                Text("·")
-                Text(row.date)
+                if let date = row.date {
+                    Text("·")
+                    Text(date)
+                }
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -55,20 +57,20 @@ struct TransactionRowView: View {
 #Preview {
     List {
         TransactionRowView(row: TransactionRow(
-            id: "1", counterpartyName: "Salary", amount: "+3200 EUR",
+            id: "1", counterparty: "Salary", amount: "+3200 EUR",
             isIncoming: true, status: .completed, date: "Today"
         ))
         TransactionRowView(row: TransactionRow(
-            id: "2", counterpartyName: "Amazon", amount: "-89 EUR",
+            id: "2", counterparty: "Amazon", amount: "-89 USD",
             isIncoming: false, status: .completed, date: "Yesterday"
         ))
         TransactionRowView(row: TransactionRow(
-            id: "3", counterpartyName: "Spotify", amount: "-9 EUR",
+            id: "3", counterparty: "Spotify", amount: "-9 EUR",
             isIncoming: false, status: .pending, date: "April 14th"
         ))
         TransactionRowView(row: TransactionRow(
-            id: "4", counterpartyName: "Uber", amount: "-12 EUR",
-            isIncoming: false, status: .declined, date: "March 28th"
+            id: "4", counterparty: "Uber", amount: "-12 EUR",
+            isIncoming: false, status: .declined, date: nil
         ))
     }
     .listStyle(.plain)

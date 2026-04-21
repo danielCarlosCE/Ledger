@@ -16,7 +16,7 @@ struct TransactionsListView: View {
                 .navigationTitle("Transactions")
         }
         .task {
-            await viewModel.load()
+            await viewModel.load(itemsPerPage: 20)
         }
     }
 

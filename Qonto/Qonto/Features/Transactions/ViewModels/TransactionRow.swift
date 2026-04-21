@@ -9,24 +9,25 @@ import Foundation
 
 struct TransactionRow: Identifiable, Hashable {
     let id: String
-    let counterpartyName: String
-    /// Pre-formatted, signed amount (e.g. `"+24 EUR"`, `"-89 EUR"`).
+    let counterparty: String
+    /// Pre-formatted, signed amount for visual display (e.g. `"+24 EUR"`, `"-89 EUR"`).
     let amount: String
     let isIncoming: Bool
     let status: Status
     /// Pre-formatted date label (e.g. `"Today"`, `"April 14th"`).
-    let date: String
+    /// Nil when the transaction has no settled date.
+    let date: String?
 
     var accessibilityLabel: String {
-        let digits = amount
-            .replacingOccurrences(of: "EUR", with: "")
-            .replacingOccurrences(of: "+", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .trimmingCharacters(in: .whitespaces)
         let direction = isIncoming ? "from" : "to"
-        return "\(status.statusText) payment of \(digits) euros \(direction) \(counterpartyName), \(date)"
+        let spokenAmount = amount.drop(while: { $0 == "+" || $0 == "-" })
+        let base = "\(status.statusText) payment of \(spokenAmount) \(direction) \(counterparty)"
+        if let date {
+            return "\(base), \(date)"
+        }
+        return base
     }
-    
+
     enum Status {
         case completed
         case pending
