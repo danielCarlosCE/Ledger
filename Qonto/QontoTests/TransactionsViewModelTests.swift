@@ -60,10 +60,34 @@ struct TransactionsViewModelTests {
         #expect(service.calls.last?.itemsPerPage == 20)
     }
 
-    // Placeholder — expand when error state lands in scope.
-    @Test("Given a service that throws, when load runs, then state reflects the error (TBD)")
-    func errorCasesPlaceholder() {
-        // TODO: assert state behavior when service throws .offline / .general
+    @Test("Given service throws offline, when load runs, then state is error offline")
+    func loadErrorOffline() async {
+        let service = MockRemoteTransactionsService()
+        service.error = .offline
+        let sut = TransactionsViewModel(service: service)
+
+        await sut.load(itemsPerPage: 20)
+
+        guard case .error(let kind) = sut.state else {
+            Issue.record("Expected .error state")
+            return
+        }
+        #expect(kind == .offline)
+    }
+
+    @Test("Given service throws general, when load runs, then state is error general")
+    func loadErrorGeneral() async {
+        let service = MockRemoteTransactionsService()
+        service.error = .general(URLError(.badServerResponse))
+        let sut = TransactionsViewModel(service: service)
+
+        await sut.load(itemsPerPage: 20)
+
+        guard case .error(let kind) = sut.state else {
+            Issue.record("Expected .error state")
+            return
+        }
+        #expect(kind == .general)
     }
 }
 

@@ -12,11 +12,31 @@ final class TransactionsViewModel {
     enum State {
         case loading
         case loaded(Content)
+        case error(ErrorKind)
 
         struct Content {
             var rows: [TransactionRow]
             var page: Int
             var canLoadMore: Bool
+        }
+    }
+
+    enum ErrorKind: Equatable {
+        case offline
+        case general
+
+        var title: String {
+            switch self {
+            case .offline: "You're offline"
+            case .general: "Something went wrong"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .offline: "Check your connection and try again."
+            case .general: "Please try again in a moment."
+            }
         }
     }
 
@@ -32,6 +52,7 @@ final class TransactionsViewModel {
 
     func load(itemsPerPage: Int) async {
         self.itemsPerPage = itemsPerPage
+        state = .loading
         do {
             let transactions = try await service.transactions(page: 1, itemsPerPage: itemsPerPage)
             let rows = makeRows(from: transactions)
@@ -42,7 +63,12 @@ final class TransactionsViewModel {
             )
             state = .loaded(content)
         } catch {
-            // Error states not yet in scope — leave state as-is.
+            switch error {
+            case .offline:
+                state = .error(.offline)
+            case .general:
+                state = .error(.general)
+            }
         }
     }
 

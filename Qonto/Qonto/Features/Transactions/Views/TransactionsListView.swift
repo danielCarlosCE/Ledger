@@ -50,10 +50,39 @@ struct TransactionsListView: View {
                 }
             }
             .listStyle(.plain)
+        case .error(let kind):
+            ContentUnavailableView {
+                Label(kind.title, systemImage: icon(for: kind))
+            } description: {
+                Text(kind.message)
+            } actions: {
+                Button("Try again") {
+                    Task { await viewModel.load(itemsPerPage: 20) }
+                }
+            }
+        }
+    }
+
+    private func icon(for kind: TransactionsViewModel.ErrorKind) -> String {
+        switch kind {
+        case .offline: "wifi.slash"
+        case .general: "exclamationmark.triangle"
         }
     }
 }
 
-#Preview {
-    TransactionsListView(viewModel: .init(service: StubRemoteTransactionsService()))
+#Preview("Success") {
+    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.success)))
+}
+
+#Preview("Offline") {
+    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.offline))))
+}
+
+#Preview("General Error") {
+    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.failure(.general(NSError())))))
+}
+
+#Preview("Loading") {
+    TransactionsListView(viewModel: TransactionsViewModel(service: StubRemoteTransactionsService(.loading)))
 }
