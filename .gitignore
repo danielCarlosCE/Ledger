@@ -1,5 +1,9 @@
+# Local environment + generated config
+.env
+Ledger/Ledger/Config.generated.swift
+
 **/Pods
 **/Carthage
 .DS_Store
-Qonto/Qonto.xcodeproj/xcuserdata
-Qonto/Qonto.xcodeproj/project.xcworkspace/xcuserdata
+Ledger/Ledger.xcodeproj/xcuserdata
+Ledger/Ledger.xcodeproj/project.xcworkspace/xcuserdata
